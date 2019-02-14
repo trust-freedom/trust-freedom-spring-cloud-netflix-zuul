@@ -51,21 +51,6 @@ public class JDBCZuulFilterDaoBuilder implements IZuulFilterDaoBuilder {
 
 
 	public JDBCZuulFilterDaoBuilder() {
-		//HikariConfig config = new HikariConfig();
-		//config.setDataSourceClassName(dataSourceClass.get());
-		//config.addDataSourceProperty("url", url.get());
-		//config.addDataSourceProperty("user", user.get());
-		//config.addDataSourceProperty("password", password.get());
-        //
-		//config.setMinimumPoolSize(minPoolSize.get());
-		//config.setMaximumPoolSize(maxPoolSize.get());
-		//config.setConnectionTimeout(connectionTimeout.get());
-		//config.setIdleTimeout(idleTimeout.get());
-		//config.setMaxLifetime(maxLifetime.get());
-        //
-		//this.dataSource = new HikariDataSource(config);
-
-
 		logger.info("开始配置druidDataSource");
 		DruidDataSource druidDataSource = new DruidDataSource();
 
@@ -90,7 +75,6 @@ public class JDBCZuulFilterDaoBuilder implements IZuulFilterDaoBuilder {
 		//datasource.setTestOnBorrow(testOnBorrow);
 		//datasource.setTestOnReturn(testOnReturn);
 		//datasource.setPoolPreparedStatements(poolPreparedStatements);
-
 
 
 		this.dataSource = druidDataSource;

@@ -37,6 +37,10 @@ public class ZuulDynamicFilterInitializerConfiguration implements SmartLifecycle
 
 
     /**
+     * 与管理页面交互的servlet
+     * 其直接调用Dao，而由于Dao相关配置使用archaius动态加载，此时archaius还无法从spring env中读取配置
+     * 故无法在创建FilterScriptManagerServlet时初始化Dao及其dataSource
+     * 改成第一次使用时加载
      * scriptmanager servlet
      * @return
      */

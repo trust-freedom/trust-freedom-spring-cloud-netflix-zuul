@@ -64,7 +64,7 @@ public class FilterScriptManagerServlet extends HttpServlet {
      * Default constructor that instantiates default dependencies (ie. the ones that are functional as opposed to those for testing).
      */
     public FilterScriptManagerServlet() {
-        //由于此时通过archaius读取不到spring env中的配置信息，故初始化tZuulFilterDao会报错
+        //由于此时通过archaius读取不到spring env中的配置信息，故初始化ZuulFilterDao会报错
         //this(ZuulFilterDaoFactory.getZuulFilterDao());
     }
 

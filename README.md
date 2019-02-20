@@ -4,7 +4,15 @@
 >
 > Spring Cloud版本： Dalston.SR5
 
+<br>
 
+## 新特性
+
+- 动态添加/删除Filter
+- 集成Apollo
+- TODO
+
+<br>
 
 ## Quick Start
 
@@ -44,6 +52,11 @@ zuul.data-source.user = 数据库user
 zuul.data-source.password = 数据库password
 zuul.data-source.min-pool-size = 10
 zuul.data-source.max-pool-size = 20
+
+# apollo相关配置
+apollo.portal.url = apollo portal URL地址
+apollo.openapi.token = apollo应用token（需要到apollo portal创建应用时获取访问token）
+#apollo.operation.by = 创建/更新的apollo用户（默认apollo）
 ```
 
 <br>
@@ -96,6 +109,42 @@ zuul.data-source.max-pool-size = 20
 **[波波老师回复](https://time.geekbang.org/course/detail/84-10581)**
 
 ![](images/Snipaste_2019-02-14_15-41-22.jpg)
+
+<br>
+
+**动态Filter上下线的同时会修改Apollo的disable property**
+
+![](images/Snipaste_2019-02-20_16-49-08.jpg)
+
+如上图，是filter上线后自动新增并发布到Apollo的配置项，key为`zuul+filter类名+filter类型+disable`，value值为false，表示启用。如动态filter下线后，会更新并发布到Apollo，将value置为true。
+
+在`com.netflix.zuul.ZuulFilter`中会先判断这个disable property，判断filter是否启用
+
+```java
+public ZuulFilterResult runFilter() {
+    ZuulFilterResult zr = new ZuulFilterResult();
+    if (!isFilterDisabled()) {  //判断是否启用
+        if (shouldFilter()) {
+            Tracer t = TracerFactory.instance().startMicroTracer("ZUUL::" + this.getClass().getSimpleName());
+            try {
+                Object res = run();
+                zr = new ZuulFilterResult(res, ExecutionStatus.SUCCESS);
+            } catch (Throwable e) {
+                t.setName("ZUUL::" + this.getClass().getSimpleName() + " failed");
+                zr = new ZuulFilterResult(ExecutionStatus.FAILED);
+                zr.setException(e);
+            } finally {
+                t.stopAndLog();
+            }
+        } else {
+            zr = new ZuulFilterResult(ExecutionStatus.SKIPPED);
+        }
+    }
+    return zr;
+}
+```
+
+
 
 <br>
 

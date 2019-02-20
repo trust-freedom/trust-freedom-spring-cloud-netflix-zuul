@@ -1,6 +1,9 @@
 package com.freedom.springcloud.zuul.filters;
 
 
+import com.ctrip.framework.apollo.openapi.client.ApolloOpenApiClient;
+import com.ctrip.framework.apollo.openapi.dto.NamespaceReleaseDTO;
+import com.ctrip.framework.apollo.openapi.dto.OpenItemDTO;
 import com.freedom.springcloud.zuul.common.Constants;
 import com.freedom.springcloud.zuul.common.FilterInfo;
 import com.freedom.springcloud.zuul.dao.ZuulFilterDaoFactory;
@@ -20,6 +23,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -79,9 +84,28 @@ public class ZuulFilterPoller {
 			.getStringProperty(Constants.Zuul_FILTER_CUSTOM_PATH, null);
 
 
+	/**
+	 * apollo配置
+	 */
+	private DynamicStringProperty portalUrl = DynamicPropertyFactory.getInstance()
+			.getStringProperty("apollo.portal.url", null);
+	private DynamicStringProperty token = DynamicPropertyFactory.getInstance()
+			.getStringProperty("apollo.openapi.token", null);
+	private DynamicStringProperty operationBy = DynamicPropertyFactory.getInstance()
+			.getStringProperty("apollo.operation.by", "apollo");
+
+	// 根据-D参数获取
+	private DynamicStringProperty appId = DynamicPropertyFactory.getInstance()
+			.getStringProperty("app.id", null);
+	private DynamicStringProperty env = DynamicPropertyFactory.getInstance()
+			.getStringProperty("env", null);
+
+
 	private static ZuulFilterPoller instance = null;  //单实例
 
 	private volatile boolean running = true;
+
+	private ApolloOpenApiClient apolloOpenApiClient;  // apollo open api client
 
 
 	/** 轮询线程 */
@@ -231,6 +255,12 @@ public class ZuulFilterPoller {
 
 		// 轮询驱逐线程
 		this.checkerForEvictThread.start();
+
+		// 创建 apollo open api client
+		apolloOpenApiClient = ApolloOpenApiClient.newBuilder()
+				.withPortalUrl(portalUrl.get())
+				.withToken(token.get())
+				.build();
 	}
 
 	/**
@@ -263,6 +293,9 @@ public class ZuulFilterPoller {
 			logger.info("adding filter to disk" + newFilter.toString());
 			writeFilterToDisk(newFilter);
 			runningFilters.put(newFilter.getFilterId(), newFilter);
+
+			// 更新disable property为false
+			updateDisableProperty(newFilter, "false");
 		}
 	}
 
@@ -337,7 +370,7 @@ public class ZuulFilterPoller {
 			}
 
 			// 3、判断是否更新disable property
-			updateDisableProperty(evictFilter);
+			updateDisableProperty(evictFilter, "true");
 
 			logger.info("evict filter success： " + evictFilter.getFilterId());
 		}
@@ -369,11 +402,46 @@ public class ZuulFilterPoller {
 
 	/**
 	 * 更新配置中的disable property
-	 * 只有当既没有激活版，又没有金丝雀版
-	 * @param evictFilter
+	 *
+	 * @param filterInfo
 	 */
-	private void updateDisableProperty(FilterInfo evictFilter) {
-		// TODO
+	private void updateDisableProperty(FilterInfo filterInfo, String value) {
+		// 构造item
+		OpenItemDTO openItemDTO = new OpenItemDTO();
+		openItemDTO.setKey(disablePropertyName(filterInfo));
+		openItemDTO.setValue(value);
+		openItemDTO.setComment("update by ZuulFilterPoller");
+		openItemDTO.setDataChangeCreatedBy(operationBy.get());
+		openItemDTO.setDataChangeLastModifiedBy(operationBy.get());
+
+		// 为了兼容apollo历史版本，先update再create
+		try {
+			// 尝试更新
+			apolloOpenApiClient.updateItem(appId.get(),env.get(),null, null, openItemDTO);
+		}
+		catch(Exception e){
+			logger.info("apollo openapi: key=" + openItemDTO.getKey() + "is not found, perform a create operation. exception: " + e.getMessage());
+
+			// 新增
+			apolloOpenApiClient.createItem(appId.get(),env.get(),null, null, openItemDTO);
+		}
+
+		// 构造发布dto
+		SimpleDateFormat df = new SimpleDateFormat("yyyyMMddHHmmss");
+		String releaseTitle = df.format(new Date()) + "-zuul-release";
+
+		NamespaceReleaseDTO namespaceReleaseDTO = new NamespaceReleaseDTO();
+		namespaceReleaseDTO.setReleaseTitle(releaseTitle);
+		namespaceReleaseDTO.setReleasedBy(operationBy.get());
+		//namespaceReleaseDTO.setReleaseComment();
+
+		// 发布namespace
+		apolloOpenApiClient.publishNamespace(appId.get(),env.get(), null, null, namespaceReleaseDTO);
+	}
+
+
+	public String disablePropertyName(FilterInfo filterInfo) {
+		return "zuul." + filterInfo.getFilterName() + "." + filterInfo.getFilterType() + ".disable";
 	}
 
 }
